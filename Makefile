@@ -18,7 +18,7 @@ endif
 CFLAGS = $(CSTANDARD) $(CWARNINGS) $(COPTIMIZE) $(CDEBUG)
 LDFLAGS = $(CFLAGS) -lm
 
-SRC = daisy.c deck.c search.c
+SRC = daisy.c deck.c search.c truecount.c
 OBJ = $(addprefix obj/,$(addsuffix .o,$(basename $(SRC))))
 DEP = $(addprefix dep/,$(addsuffix .d,$(basename $(notdir $(wildcard src/*.c)))))
 

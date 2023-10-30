@@ -19,9 +19,10 @@
 #define DECK_H
 
 enum {
-	TOTAL, LOWACE, TWO, THREE,
-	FOUR, FIVE, SIX, SEVEN,
-	EIGHT, NINE, TEN, ACE,
+	TOTAL, NONE, LOWACE = 1,
+	TWO, THREE, FOUR, FIVE,
+	SIX, SEVEN, EIGHT, NINE,
+	TEN, ACE,
 };
 
 typedef unsigned card_t;
@@ -31,6 +32,9 @@ void deck_init(deck_t deck, unsigned decks);
 void deck_single(deck_t deck, card_t card);
 
 card_t deck_first(deck_t deck);
+card_t deck_random(deck_t deck, unsigned long long r);
+
+double deck_true(deck_t deck);
 
 void deck_draw(deck_t deck, card_t card);
 void deck_put(deck_t deck, card_t card);

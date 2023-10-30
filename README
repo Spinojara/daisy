@@ -2,3 +2,6 @@ Daisy
 =====
 
 A probability calculator for blackjack.
+
+Splits and Daisy peeking blackjack are calculated naively. The error
+should be negligible.

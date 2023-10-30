@@ -15,33 +15,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef SEARCH_H
-#define SEARCH_H
+#ifndef TRUECOUNT_H
+#define TRUECOUNT_H
 
 #include "deck.h"
 
-enum {
-	HIT        =  0x1,
-	STAND      =  0x2,
-	DOUBLEDOWN =  0x4,
-	SPLIT      =  0x8,
-	SURRENDER  = 0x10,
-	PEEK       = 0x20,
-};
+double deck_true(deck_t deck);
 
-struct rootsearchinfo {
-	double hit;
-	double stand;
-	double doubledown;
-	double split;
-	double surrender;
-	double expectation;
-
-	char best;
-};
-
-void maximize_root(struct rootsearchinfo *rsi, char str[4]);
-
-struct rootsearchinfo *search(struct rootsearchinfo *rsi, deck_t deck, deck_t player, card_t daisy);
+double simulate_true(unsigned long shoes, unsigned decks, double penetration);
 
 #endif

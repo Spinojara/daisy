@@ -23,87 +23,88 @@
 
 #include "util.h"
 
-const double BLACKJACK_PAYS       = 3.0 / 2.0; /* 1.0 to DBL_MAX */
-const double SURRENDER_GIVES_BACK = 0.5;       /* 0.0 to 1.0 */
-const int    MAX_SPLITS           = 1;         /* 0 to INT_MAX */
-const int    DOUBLE_AFTER_SPLIT   = 0;         /* 0 or 1 */
-const int    PEEK_BLACKJACK       = 1;         /* 0 or 1 */
-const int    HITS_ON_SOFT_17      = 0;         /* 0 or 1 */
-const int    DRAW_TO_SPLIT_ACES   = 0;         /* 0 or 1 */
-const int    DOUBLE_ONLY_9_10_11  = 0;         /* 0 or 1 */
-const int    RESPLIT_ACES         = 0;         /* 0 or 1 */
-const int    SURRENDER_VS_ACES    = 1;         /* 0 or 1 */
-const int    SURRENDER_ANYTIME    = 0;         /* 0 or 1 */
+extern const double BLACKJACK_PAYS;
+extern const double SURRENDER_GIVES_BACK;
+extern const int    MAX_SPLITS;
+extern const int    DOUBLE_AFTER_SPLIT;
+extern const int    PEEK_BLACKJACK;
+extern const int    DONT_PEEK_10;
+extern const int    HITS_ON_SOFT_17;
+extern const int    DRAW_TO_SPLIT_ACES;
+extern const int    DOUBLE_ONLY_9_10_11;
+extern const int    RESPLIT_ACES;
+extern const int    SURRENDER_ALLOWED;
+extern const int    SURRENDER_VS_ACES;
+extern const int    SURRENDER_ANYTIME;
 
-double maximize_root(struct rootsearchinfo *rsi, char str[4]) {
-	double e = -INFINITY;
+void maximize_root(struct rootsearchinfo *rsi, char str[4]) {
+	rsi->expectation = -INFINITY;
 	char hit_or_stand = 0;
-	if (rsi->hit > e) {
-		e = rsi->hit;
+	if (rsi->hit > rsi->expectation) {
+		rsi->expectation = rsi->hit;
+		rsi->best = 'H';
 		hit_or_stand = 'H';
 		if (str)
 			sprintf(str, " H ");
 	}
-	if (rsi->stand > e) {
-		e = rsi->stand;
+	if (rsi->stand > rsi->expectation) {
+		rsi->expectation = rsi->stand;
 		hit_or_stand = 'S';
+		rsi->best = 'S';
 		if (str)
 			sprintf(str, " S ");
 	}
-	if (rsi->doubledown > e) {
-		e = rsi->doubledown;
+	if (rsi->doubledown > rsi->expectation) {
+		rsi->expectation = rsi->doubledown;
+		rsi->best = 'D';
 		if (str)
 			sprintf(str, "D/%c", hit_or_stand);
 	}
-	if (rsi->split > e) {
-		e = rsi->split;
+	if (rsi->split > rsi->expectation) {
+		rsi->expectation = rsi->split;
+		rsi->best = 'P';
 		if (str)
 			sprintf(str, " P ");
 	}
-	if (rsi->surrender > e) {
-		e = rsi->surrender;
+	if (rsi->surrender > rsi->expectation) {
+		rsi->expectation = rsi->surrender;
+		rsi->best = 'R';
 		if (str)
 			sprintf(str, "R/%c", hit_or_stand);
 	}
-	return e;
 }
 
-double search_dealer(deck_t deck, unsigned players, int blackjack, deck_t dealers) {
-	unsigned sum = deck_sum(dealers);
-	int dealer_blackjack = dealers[TOTAL] == 2 && sum == 21;
-	int dealer_hits = sum < 17;
+double search_daisy(deck_t deck, unsigned player, int blackjack, deck_t daisy) {
+	unsigned sum = deck_sum(daisy);
+	int daisy_blackjack = daisy[TOTAL] == 2 && sum == 21;
+	int daisy_hits = sum < 17;
 	if (HITS_ON_SOFT_17 && sum == 17) {
-		deck_put(dealers, TEN);
-		dealer_hits = deck_sum(dealers) == 17;
-		deck_draw(dealers, TEN);
+		deck_put(daisy, TEN);
+		daisy_hits = deck_sum(daisy) == 17;
+		deck_draw(daisy, TEN);
 	}
-	if (dealer_hits) {
+	if (daisy_hits) {
 		double p = 0.0;
 
-#if 0
-		card_t up_card = deck_first(dealers);
-#endif
-		card_t impossible = LOWACE;
-		assert(!deck[impossible]);
-#if 0
-		assert(!deck[impossible]);
-		if (up_card == ACE)
-			impossible = TEN;
-		else if (up_card == TEN)
-			impossible = ACE;
-#endif
+		card_t up_card = deck_first(daisy);
+		card_t impossible = NONE;
+
+		if (PEEK_BLACKJACK) {
+			if (up_card == ACE)
+				impossible = TEN;
+			else if (up_card == TEN && !DONT_PEEK_10)
+				impossible = ACE;
+		}
 
 		for (card_t card = TWO; card <= ACE; card++) {
-#if 0
-			if (PEEK_BLACKJACK && up_card + card == 21)
+			if (card == impossible)
 				continue;
-#endif
 			if (deck[card]) {
 				double q = (double)deck[card] / (deck[TOTAL] - deck[impossible]);
 				deck_draw(deck, card);
-				deck_put(dealers, card);
-				double r = search_dealer(deck, players, blackjack, dealers);
-				deck_draw(dealers, card);
+				deck_put(daisy, card);
+				double r = search_daisy(deck, player, blackjack, daisy);
+				deck_draw(daisy, card);
 				deck_put(deck, card);
 				p += q * r;
 			}
@@ -114,84 +115,56 @@ double search_dealer(deck_t deck, unsigned players, int blackjack, deck_t dealer
 		return 1.0 + (BLACKJACK_PAYS - 1.0) * blackjack;
 	}
 	else {
-		if (players > sum)
+		if (player > sum)
 			return 1.0 + (BLACKJACK_PAYS - 1.0) * blackjack;
-		else if (players < sum)
+		else if (player < sum)
 			return -1.0;
 		else
-			return BLACKJACK_PAYS * (blackjack && !dealer_blackjack) - 1.0 * (!blackjack && dealer_blackjack);
+			return BLACKJACK_PAYS * (blackjack && !daisy_blackjack) - 1.0 * (!blackjack && daisy_blackjack);
 	}
 }
 
-card_t can_split(deck_t players) {
-	if (players[TOTAL] != 2)
+card_t can_split(deck_t player) {
+	if (player[TOTAL] != 2)
 		return 0;
 
 	for (card_t card = TWO; card <= ACE; card++)
-		if (players[card] == 2)
+		if (player[card] == 2)
 			return card;
 
 	return 0;
 }
 
-double search_action(deck_t deck, deck_t players, deck_t dealers, unsigned actions, long splits) {
-	if (actions & PEEK && 0) {
-		double ret = 0.0;
-
-		card_t up_card = deck_first(dealers);
-		card_t impossible = LOWACE;
-		assert(!deck[impossible]);
-		if (up_card == ACE)
-			impossible = TEN;
-		else if (up_card == TEN)
-			impossible = ACE;
-
-		for (card_t card = TWO; card <= ACE; card++) {
-			if (up_card + card == 21) {
-				continue;
-			}
-			if (deck[card]) {
-				double q = (double)deck[card] / (deck[TOTAL] - deck[impossible]);
-				deck_draw(deck, card);
-				deck_put(dealers, card);
-				double r = search_action(deck, players, dealers, actions ^ PEEK, splits);
-				deck_draw(dealers, card);
-				deck_put(deck, card);
-				ret += q * r;
-			}
-		}
-		return ret;
-	}
-
-	unsigned sum = deck_sum(players);
+double search_action(deck_t deck, deck_t player, deck_t daisy, unsigned actions, long splits, int ply) {
+	unsigned sum = deck_sum(player);
 	if (sum > 21)
 		return -1.0;
 
 	unsigned new_actions = STAND | HIT;
 	if (SURRENDER_ANYTIME)
 		new_actions |= SURRENDER;
-	card_t splitcard = can_split(players);
+	card_t splitcard = can_split(player);
 
 	double e = -INFINITY;
+	if (actions & STAND) {
+		int blackjack = player[TOTAL] == 2 && sum == 21 && !splits;
+		double stand = search_daisy(deck, sum, blackjack, daisy);
+		e = MAX(e, stand);
+	}
 	if (actions & HIT) {
 		double hit = 0.0;
 		for (card_t card = TWO; card <= ACE; card++) {
 			if (deck[card]) {
 				double q = (double)deck[card] / deck[TOTAL];
 				deck_draw(deck, card);
-				deck_put(players, card);
-				double r = search_action(deck, players, dealers, new_actions, splits);
-				deck_draw(players, card);
+				deck_put(player, card);
+				double r = search_action(deck, player, daisy, new_actions, splits, ply + 1);
+				deck_draw(player, card);
 				deck_put(deck, card);
 				hit += q * r;
 			}
 		}
 		e = MAX(e, hit);
-	}
-	if (actions & STAND) {
-		int blackjack = players[TOTAL] == 2 && sum == 21;
-		double stand = search_dealer(deck, sum, blackjack, dealers);
-		e = MAX(e, stand);
 	}
 	if (actions & DOUBLEDOWN && (!DOUBLE_ONLY_9_10_11 || (9 <= sum && sum <= 11))) {
 		double doubledown = 0.0;
@@ -199,43 +172,47 @@ double search_action(deck_t deck, deck_t players, deck_t dealers, unsigned actio
 			if (deck[card]) {
 				double q = (double)deck[card] / deck[TOTAL];
 				deck_draw(deck, card);
-				deck_put(players, card);
-				double r = search_action(deck, players, dealers, STAND, splits);
-				deck_draw(players, card);
+				deck_put(player, card);
+				double r = search_action(deck, player, daisy, STAND, splits, ply + 1);
+				deck_draw(player, card);
 				deck_put(deck, card);
 				doubledown += q * r;
 			}
 		}
 		e = MAX(e, 2 * doubledown);
 	}
+	/* Splits are played one hand at a time instead of at the same
+	 * time like normal blackjack. The error should be negligible.
+	 */
 	if (actions & SPLIT && splitcard) {
 		double split = 0.0;
-		deck_draw(players, splitcard);
+		deck_draw(player, splitcard);
+
+		new_actions &= ~(HIT | SPLIT | DOUBLEDOWN);
+		if (splits + 1 < MAX_SPLITS && (RESPLIT_ACES || splitcard != ACE))
+			new_actions |= SPLIT;
+		if (DRAW_TO_SPLIT_ACES || splitcard != ACE) {
+			new_actions |= HIT;
+			if (DOUBLE_AFTER_SPLIT)
+				new_actions |= DOUBLEDOWN;
+		}
 
 		for (card_t card = TWO; card <= ACE; card++) {
 			if (deck[card]) {
 				double q = (double)deck[card] / deck[TOTAL];
 				deck_draw(deck, card);
-				deck_put(players, card);
-				new_actions &= ~(HIT | SPLIT | DOUBLEDOWN);
-				if (splits + 1 < MAX_SPLITS && (RESPLIT_ACES || card != ACE))
-					new_actions |= SPLIT;
-				if (DRAW_TO_SPLIT_ACES || card != ACE)
-					new_actions |= HIT;
-				if (DOUBLE_AFTER_SPLIT)
-					new_actions |= DOUBLEDOWN;
-				double r = search_action(deck, players, dealers, new_actions, splits + 1);
-				deck_draw(players, card);
+				deck_put(player, card);
+				double r = search_action(deck, player, daisy, new_actions, splits + 1, ply + 1);
+				deck_draw(player, card);
 				deck_put(deck, card);
 				split += q * r;
 			}
 		}
 
-		deck_put(players, splitcard);
+		deck_put(player, splitcard);
 		e = MAX(e, 2 * split);
 	}
-	/* DOES NOT WORK PROPERLY WITH !SURRENDER_VS_ACES */
-	if (actions & SURRENDER && (SURRENDER_VS_ACES || deck_first(dealers) != ACE)) {
+	if (actions & SURRENDER && (SURRENDER_VS_ACES || deck_first(daisy) != ACE)) {
 		double surrender = SURRENDER_GIVES_BACK - 1.0;
 		e = MAX(e, surrender);
 	}
@@ -243,35 +220,33 @@ double search_action(deck_t deck, deck_t players, deck_t dealers, unsigned actio
 	return e;
 }
 
-struct rootsearchinfo *search(struct rootsearchinfo *rsi, deck_t deck, deck_t players, card_t dealers) {
-	deck_t dealersdeck;
-	deck_single(dealersdeck, dealers);
+struct rootsearchinfo *search(struct rootsearchinfo *rsi, deck_t deck, deck_t player, card_t daisy) {
+	deck_t daisy_deck;
+	deck_single(daisy_deck, daisy);
 
-	deck_draw(deck, dealers);
+	deck_draw(deck, daisy);
 	for (card_t card = TWO; card <= ACE; card++)
-		for (unsigned i = 0; i < players[card]; i++)
+		for (unsigned i = 0; i < player[card]; i++)
 			deck_draw(deck, card);
 
-	unsigned peek = PEEK_BLACKJACK ? PEEK : 0;
-
 	/* HIT */
-	rsi->hit = search_action(deck, players, dealersdeck, peek | HIT, 0);
+	rsi->hit = search_action(deck, player, daisy_deck, HIT, 0, 0);
 
 	/* STAND */
-	rsi->stand = search_action(deck, players, dealersdeck, peek | STAND, 0);
+	rsi->stand = search_action(deck, player, daisy_deck, STAND, 0, 0);
 
 	/* DOUBLEDOWN */
-	rsi->doubledown = search_action(deck, players, dealersdeck, peek | DOUBLEDOWN, 0);
+	rsi->doubledown = search_action(deck, player, daisy_deck, DOUBLEDOWN, 0, 0);
 
 	/* SPLIT */
-	rsi->split = search_action(deck, players, dealersdeck, peek | SPLIT, 0);
+	rsi->split = search_action(deck, player, daisy_deck, SPLIT, 0, 0);
 
 	/* SURRENDER */
-	rsi->surrender = search_action(deck, players, dealersdeck, peek | SURRENDER, 0);
+	rsi->surrender = SURRENDER_ALLOWED ? search_action(deck, player, daisy_deck, SURRENDER, 0, 0) : -INFINITY;
 
-	deck_put(deck, dealers);
+	deck_put(deck, daisy);
 	for (card_t card = TWO; card <= ACE; card++)
-		for (unsigned i = 0; i < players[card]; i++)
+		for (unsigned i = 0; i < player[card]; i++)
 			deck_put(deck, card);
 
 	return rsi;

@@ -20,41 +20,54 @@
 #include <assert.h>
 
 void deck_init(deck_t deck, unsigned decks) {
-	deck[TOTAL]  = decks * 52;
-	deck[LOWACE] = 0;
-	deck[TWO]    = 4 * decks;
-	deck[THREE]  = 4 * decks;
-	deck[FOUR]   = 4 * decks;
-	deck[FIVE]   = 4 * decks;
-	deck[SIX]    = 4 * decks;
-	deck[SEVEN]  = 4 * decks;
-	deck[EIGHT]  = 4 * decks;
-	deck[NINE]   = 4 * decks;
-	deck[TEN]    = 4 * 4 * decks;
-	deck[ACE]    = 4 * decks;
+	deck[TOTAL] = decks * 52;
+	deck[NONE]  = 0;
+	deck[TWO]   = 4 * decks;
+	deck[THREE] = 4 * decks;
+	deck[FOUR]  = 4 * decks;
+	deck[FIVE]  = 4 * decks;
+	deck[SIX]   = 4 * decks;
+	deck[SEVEN] = 4 * decks;
+	deck[EIGHT] = 4 * decks;
+	deck[NINE]  = 4 * decks;
+	deck[TEN]   = 4 * 4 * decks;
+	deck[ACE]   = 4 * decks;
 }
 
 void deck_single(deck_t deck, card_t card) {
 	assert(card);
-	deck[TOTAL]  = 1;
-	deck[LOWACE] = 0;
-	deck[TWO]    = 0;
-	deck[THREE]  = 0;
-	deck[FOUR]   = 0;
-	deck[FIVE]   = 0;
-	deck[SIX]    = 0;
-	deck[SEVEN]  = 0;
-	deck[EIGHT]  = 0;
-	deck[NINE]   = 0;
-	deck[TEN]    = 0;
-	deck[ACE]    = 0;
-	deck[card]   = 1;
+	deck[TOTAL] = 1;
+	deck[NONE]  = 0;
+	deck[TWO]   = 0;
+	deck[THREE] = 0;
+	deck[FOUR]  = 0;
+	deck[FIVE]  = 0;
+	deck[SIX]   = 0;
+	deck[SEVEN] = 0;
+	deck[EIGHT] = 0;
+	deck[NINE]  = 0;
+	deck[TEN]   = 0;
+	deck[ACE]   = 0;
+	deck[card]  = 1;
 }
 
 card_t deck_first(deck_t deck) {
 	for (card_t card = TWO; card <= ACE; card++)
 		if (deck[card])
 			return card;
+	assert(0);
+	return 0;
+}
+
+card_t deck_random(deck_t deck, unsigned long long r) {
+	r = r % deck[TOTAL];
+	
+	unsigned total = 0;
+	for (card_t card = TWO; card <= ACE; card++) {
+		total += deck[card];
+		if (total > r)
+			return card;
+	}
 	assert(0);
 	return 0;
 }
